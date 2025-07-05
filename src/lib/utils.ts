@@ -173,7 +173,7 @@ export const generateUrlImage = (
     // Xử lý URL từ Imgur
     if (url.includes("i.imgur.com")) {
       const urlObject = new URL(url);
-      const pathname = urlObject.pathname;
+      const pathname = urlObject.pathname; // e.g., /o62G3Zh.jpeg
       const lastDotIndex = pathname.lastIndexOf('.');
 
       // Nếu không có phần mở rộng, không phải link ảnh trực tiếp, trả về URL gốc
@@ -181,28 +181,44 @@ export const generateUrlImage = (
         return url;
       }
 
-      const filenameWithMaybeSuffix = pathname.substring(0, lastDotIndex);
-      const extension = pathname.substring(lastDotIndex + 1);
+      const filenamePart = pathname.substring(1, lastDotIndex); // e.g., o62G3Zh
+      const extension = pathname.substring(lastDotIndex); // e.g., .jpeg
 
-      // Xóa hậu tố kích thước cũ của Imgur (nếu có) để đảm bảo an toàn
-      const baseFilename = filenameWithMaybeSuffix.replace(/[sbtmlh]$/, '');
+      let baseFilename = filenamePart;
+      const lastChar = filenamePart.slice(-1);
+      const isPotentialSuffix = 'sbtmlh'.includes(lastChar);
+
+      // Heuristic: ID Imgur chuẩn thường có 5 hoặc 7 ký tự.
+      // Chỉ xóa ký tự cuối nếu nó là một hậu tố tiềm năng VÀ độ dài của tên file không phải là 5 hoặc 7.
+      // Điều này ngăn việc xóa nhầm ký tự của ID gốc (ví dụ: 'h' trong 'o62G3Zh').
+      if (isPotentialSuffix && filenamePart.length !== 7 && filenamePart.length !== 5) {
+        baseFilename = filenamePart.substring(0, filenamePart.length - 1);
+      }
 
       // Xác định hậu tố mới dựa trên chiều rộng từ tham số `size`
       const width = parseInt(size.split('x')[0], 10);
-      let suffix = '';
+      let newSuffix = '';
       if (width <= 160) {
-        suffix = 'b'; // Big Square (160x160)
+        newSuffix = 'b'; // Big Square (160x160)
       } else if (width <= 320) {
-        suffix = 'm'; // Medium Thumbnail (320x320)
+        newSuffix = 'm'; // Medium Thumbnail (320x320)
       } else if (width <= 640) {
-        suffix = 'l'; // Large Thumbnail (640x640)
-      } else {
-        suffix = 'h'; // Huge Thumbnail (1024x1024)
+        newSuffix = 'l'; // Large Thumbnail (640x640)
+      } else if (width <= 1024) {
+        newSuffix = 'h'; // Huge Thumbnail (1024x1024)
+      }
+      // Nếu không có hậu tố nào phù hợp (ví dụ: yêu cầu kích thước lớn hơn 1024),
+      // chúng ta sẽ trả về ảnh gốc bằng cách không thêm hậu tố.
+
+      // Nếu không có hậu tố mới, trả về ảnh gốc đã được làm sạch
+      if (!newSuffix) {
+        return `${urlObject.origin}/${baseFilename}${extension}`;
       }
 
       // Tạo lại URL mới với hậu tố kích thước
-      return `${urlObject.origin}${baseFilename}${suffix}.${extension}`;
+      return `${urlObject.origin}/${baseFilename}${newSuffix}${extension}`;
     }
+
 
     // Nếu không phải từ domain được hỗ trợ, trả về URL gốc
     return url;
