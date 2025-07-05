@@ -173,16 +173,19 @@ export const generateUrlImage = (
     // Xử lý URL từ Imgur
     if (url.includes("i.imgur.com")) {
       const urlObject = new URL(url);
-      const pathParts = urlObject.pathname.split('.');
+      const pathname = urlObject.pathname;
+      const lastDotIndex = pathname.lastIndexOf('.');
 
-      // Kiểm tra nếu không phải là link ảnh trực tiếp (ví dụ: không có phần mở rộng .png, .jpg)
-      if (pathParts.length < 2) return url;
+      // Nếu không có phần mở rộng, không phải link ảnh trực tiếp, trả về URL gốc
+      if (lastDotIndex === -1) {
+        return url;
+      }
 
-      const filenameWithSuffix = pathParts.slice(0, -1).join('.');
-      const extension = pathParts[pathParts.length - 1];
+      const filenameWithMaybeSuffix = pathname.substring(0, lastDotIndex);
+      const extension = pathname.substring(lastDotIndex + 1);
 
-      // Xóa hậu tố kích thước cũ của Imgur (nếu có) để tránh lỗi (vd: .../abcms.png)
-      const baseFilename = filenameWithSuffix.replace(/[sbtmlh]$/, '');
+      // Xóa hậu tố kích thước cũ của Imgur (nếu có) để đảm bảo an toàn
+      const baseFilename = filenameWithMaybeSuffix.replace(/[sbtmlh]$/, '');
 
       // Xác định hậu tố mới dựa trên chiều rộng từ tham số `size`
       const width = parseInt(size.split('x')[0], 10);
@@ -218,16 +221,16 @@ export const generateUrlImageResponsive = (url: string, type: 'poster' | 'thumb'
       // Mobile: sử dụng kích thước nhỏ hơn
       return generateUrlImage(url, "200x0");
     } else {
-      // PC: sử dụng kích thước theo loại ảnh
+      // PC: sử dụng kích thước lớn hơn để tăng độ nét
       if (type === 'thumb') {
-        return generateUrlImage(url, "400x0");
+        return generateUrlImage(url, "600x0"); // Tăng từ 400
       } else {
-        return generateUrlImage(url, "300x0");
+        return generateUrlImage(url, "500x0"); // Tăng từ 300
       }
     }
   }
   // Fallback cho server-side rendering
-  return generateUrlImage(url, type === 'thumb' ? "400x0" : "300x0");
+  return generateUrlImage(url, type === 'thumb' ? "600x0" : "500x0");
 };
 
 // Hàm riêng cho search preview với kích thước 100x0
