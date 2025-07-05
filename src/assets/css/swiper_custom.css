@@ -1,0 +1,9 @@
+.movie-slider .swiper {
+  overflow: hidden;
+}
+
+@media screen and (max-width: 989px) {
+  .movie-slider .swiper {
+    overflow: visible;
+  }
+}
