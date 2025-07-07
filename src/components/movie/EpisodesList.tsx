@@ -56,7 +56,6 @@ const EpisodesList = ({
   const [isMounted, setIsMounted] = useState(false);
 
   const dispatch: AppDispatch = useDispatch();
-  // NOTE: We keep these selectors but will avoid using them in a way that causes hydration errors.
   const { windowWidth } = useSelector((state: RootState) => state.system);
   const { currentEpisode } = useSelector((state: RootState) => state.movie.movieInfo);
 
@@ -87,9 +86,11 @@ const EpisodesList = ({
 
   // Hàm lấy icon và title dựa trên server name
   const getServerInfo = (serverName: string) => {
-    if (serverName.includes("Vietsub")) {
+    // Thêm guard để đảm bảo hàm không bị crash nếu serverName không hợp lệ
+    const safeServerName = serverName || '';
+    if (safeServerName.includes("Vietsub")) {
       return { title: "Phụ đề", icon: vietsubIcon };
-    } else if (serverName.includes("Thuyết Minh")) {
+    } else if (safeServerName.includes("Thuyết Minh")) {
       return { title: "Thuyết minh", icon: thuyetMinhIcon };
     } else {
       return { title: "Lồng tiếng", icon: dubbedIcon };
@@ -156,8 +157,6 @@ const EpisodesList = ({
     setPage(1);
   };
 
-  // Render một placeholder cho đến khi component được mount ở client
-  // Đây là cách phòng chống lỗi hydration quan trọng nhất.
   if (!isMounted) {
     return (
       <Box className="flex flex-col gap-4 mt-4">
@@ -179,6 +178,10 @@ const EpisodesList = ({
       {/* Tabs ngang cho các server */}
       <Box className="flex gap-2 items-center min-h-[40px]">
         {episodes.map((server, index) => {
+          // Thêm guard để bỏ qua các server không hợp lệ
+          if (!server || typeof server.server_name !== 'string') {
+            return null;
+          }
           const { title, icon } = getServerInfo(server.server_name);
           const isActive = activeServerIndex === index;
 
@@ -208,11 +211,10 @@ const EpisodesList = ({
       <Box
         className={`grid grid-cols-${colums.base} md:grid-cols-${colums.md} lg:grid-cols-${colums.lg} xl:grid-cols-${colums.xl} lg:gap-4 gap-2`}
       >
-        {episodeDisplay.map((item: Episode, index: number) => {
+        {/* CRITICAL FIX: Ensure currentServer exists before mapping */}
+        {currentServer && episodeDisplay.map((item: Episode, index: number) => {
           if (!item || !item.link_embed) return null;
 
-          // HYDRATION FIX: Tạm thời vô hiệu hóa việc đánh dấu tập đang active
-          // để tránh lỗi. Server và client sẽ luôn render `isActive={false}`.
           const isActive = false;
 
           return (
@@ -232,8 +234,6 @@ const EpisodesList = ({
       {currentEpisodes.length > limitDisplay && (
         <Box className="flex mx-auto my-6">
           <PaginationRoot
-            // HYDRATION FIX: Tạm thời vô hiệu hóa kích thước động để tránh lỗi.
-            // Server và client sẽ luôn render cùng một kích thước.
             size={"md"}
             count={currentEpisodes.length}
             pageSize={limitDisplay}
