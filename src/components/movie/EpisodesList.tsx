@@ -6,9 +6,7 @@ import { PaginationItems, PaginationRoot } from "../ui/pagination";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
 import {
-  changeQuery,
   formatTypeMovie,
-  getIdFromLinkEmbed,
   handleShowToaster,
 } from "@/lib/utils";
 import { setCurrentEpisode } from "@/store/slices/movieSlice";
@@ -40,15 +38,6 @@ interface EpisodesListProps {
 }
 
 const limitDisplay = 24;
-
-const generateRandomId = (length: number = 7): string => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-};
 
 const EpisodesList = ({
   episodes = [],
@@ -130,11 +119,6 @@ const EpisodesList = ({
     setEpisodeDisplay(currentEpisodes.slice(start, end));
   }, [currentEpisodes, page, isMounted]);
 
-  /*
-   * NOTE: This useEffect block is commented out to fix a client-side hydration error.
-   */
-  // useEffect(() => { ... });
-
   const handleChangePage = (newPage: number) => {
     if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) return;
 
@@ -148,24 +132,13 @@ const EpisodesList = ({
     }
   };
 
+  // FIXED: Removed URL manipulation logic to prevent hydration errors.
+  // This function now only updates the Redux state.
   const handleSetCurrentEpisode = (item: Episode) => {
     if (!isMounted || !item || redirect) return;
     if (currentEpisode?.link_embed === item.link_embed) return;
 
     try {
-      let idForQuery = getIdFromLinkEmbed(item.link_embed, 8);
-      if (!idForQuery) {
-        idForQuery = generateRandomId(7);
-      }
-
-      const type = formatTypeMovie(currentServer.server_name);
-      const newQuery = [
-        { key: "id", value: idForQuery },
-        { key: "episode", value: item.slug || '' },
-        { key: "type", value: type },
-      ];
-
-      changeQuery(newQuery);
       dispatch(setCurrentEpisode(item));
 
       if (showToaster) {
