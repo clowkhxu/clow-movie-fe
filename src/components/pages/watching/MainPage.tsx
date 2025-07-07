@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import SectionVideo from "./SectionVideo";
 import SectionInfo from "./SectionInfo";
 import MovieSuggestions from "@/components/movie/MovieSuggestions";
-import EpisodesList from "@/components/movie/EpisodeList";
+import EpisodesList from "@/components/movie/EpisodesList";
 import SkeletonWachingPage from "@/components/skeletons/SkeletonWatchingPage";
 import SkeletonRapPhimButton from "@/components/skeletons/SkeletonRapPhimButton";
 import EmptyData from "@/components/EmptyData";
@@ -170,7 +170,7 @@ const MainPage = () => {
             {movie?.name} - {currentEpisode?.name}
           </h3>
         )}
-        
+
         <Box className="flex flex-col lg:px-4">
           <SectionVideo />
           <Box className="p-4 bg-[#08080a] border-l border-r border-b border-[#ffffff10] xl:rounded-bl-2xl xl:rounded-br-2xl flex justify-between">
@@ -185,9 +185,9 @@ const MainPage = () => {
               {loading ? (
                 <SkeletonRapPhimButton />
               ) : (
-                <RapPhimButton 
-                  placement="horizontal" 
-                  responsiveText 
+                <RapPhimButton
+                  placement="horizontal"
+                  responsiveText
                   isTheaterMode={isTheaterMode}
                   onToggle={handleToggleTheaterMode}
                 />
