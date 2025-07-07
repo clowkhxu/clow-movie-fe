@@ -1,0 +1,62 @@
+@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --breakpoint-xs: 28.5rem; /* 456px */
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: #191b24;
+  font-family: Arial, Helvetica, sans-serif, "Inter", "Segoe UI", sans-serif;
+}
+
+.text-primary {
+  color: #ffd875;
+}
+
+.title-text {
+  background: radial-gradient(
+      50% 124.93% at 95.86% -10%,
+      #3efad9 0,
+      hsla(0, 0%, 100%, 0) 100%
+    ),
+    linear-gradient(91.56deg, #ff9357 1.54%, #9100ff 98.71%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* truncate */
+.two {
+  -webkit-line-clamp: 2;
+}
+
+.three {
+  -webkit-line-clamp: 3;
+}
+
+.one {
+  -webkit-line-clamp: 1;
+}
+
+.truncate-lines.two {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+}
