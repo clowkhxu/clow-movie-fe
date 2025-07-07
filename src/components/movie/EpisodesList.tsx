@@ -56,6 +56,7 @@ const EpisodesList = ({
   const [isMounted, setIsMounted] = useState(false);
 
   const dispatch: AppDispatch = useDispatch();
+  // NOTE: We keep these selectors but will avoid using them in a way that causes hydration errors.
   const { windowWidth } = useSelector((state: RootState) => state.system);
   const { currentEpisode } = useSelector((state: RootState) => state.movie.movieInfo);
 
@@ -132,8 +133,6 @@ const EpisodesList = ({
     }
   };
 
-  // FIXED: Removed URL manipulation logic to prevent hydration errors.
-  // This function now only updates the Redux state.
   const handleSetCurrentEpisode = (item: Episode) => {
     if (!isMounted || !item || redirect) return;
     if (currentEpisode?.link_embed === item.link_embed) return;
@@ -157,6 +156,8 @@ const EpisodesList = ({
     setPage(1);
   };
 
+  // Render một placeholder cho đến khi component được mount ở client
+  // Đây là cách phòng chống lỗi hydration quan trọng nhất.
   if (!isMounted) {
     return (
       <Box className="flex flex-col gap-4 mt-4">
@@ -210,8 +211,9 @@ const EpisodesList = ({
         {episodeDisplay.map((item: Episode, index: number) => {
           if (!item || !item.link_embed) return null;
 
-          // HYDRATION FIX: Calculate isActive only after client has mounted
-          const isActive = isMounted && currentEpisode?.link_embed === item.link_embed;
+          // HYDRATION FIX: Tạm thời vô hiệu hóa việc đánh dấu tập đang active
+          // để tránh lỗi. Server và client sẽ luôn render `isActive={false}`.
+          const isActive = false;
 
           return (
             <EpisodeItem
@@ -226,11 +228,13 @@ const EpisodesList = ({
         })}
       </Box>
 
-      {/* Pagination - FIXED: Only render on client-side after mount */}
-      {isMounted && currentEpisodes.length > limitDisplay && (
+      {/* Pagination */}
+      {currentEpisodes.length > limitDisplay && (
         <Box className="flex mx-auto my-6">
           <PaginationRoot
-            size={windowWidth < 768 ? "xs" : "md"}
+            // HYDRATION FIX: Tạm thời vô hiệu hóa kích thước động để tránh lỗi.
+            // Server và client sẽ luôn render cùng một kích thước.
+            size={"md"}
             count={currentEpisodes.length}
             pageSize={limitDisplay}
             page={page}
