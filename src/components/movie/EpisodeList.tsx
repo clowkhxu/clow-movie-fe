@@ -130,45 +130,59 @@ const EpisodesList = ({
     setEpisodeDisplay(currentEpisodes.slice(start, end));
   }, [currentEpisodes, page, isMounted]);
 
-  // Xử lý URL query
-  useEffect(() => {
-    if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect) {
-      return;
-    }
+  /*
+   * NOTE: This useEffect block has been commented out to fix a client-side hydration error.
+   * This code was responsible for reading the 'episode' and 'type' from the URL query
+   * parameters on page load and automatically selecting the corresponding episode.
+   *
+   * The error ("Application error: a client-side exception has occurred") happens because:
+   * 1. The server pre-renders the page without any episode selected (it cannot access URL query params).
+   * 2. The client loads, runs this effect, reads the URL, and updates the state via `dispatch(setCurrentEpisode(...))`.
+   * 3. This immediate state change causes the client's first render to be different from the
+   * server's rendered HTML, leading to a hydration mismatch error in Next.js.
+   *
+   * By removing this functionality, the app will no longer auto-select an episode when you
+   * refresh the page, but it will prevent the crash. The functionality to UPDATE the URL
+   * when a user *clicks* an episode remains intact.
+  */
+  // useEffect(() => {
+  //   if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect) {
+  //     return;
+  //   }
 
-    if (typeof window !== 'undefined') {
-      try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const episodeSlugFromQuery = queryParams.get('episode');
-        const typeFromQuery = queryParams.get('type');
+  //   if (typeof window !== 'undefined') {
+  //     try {
+  //       const queryParams = new URLSearchParams(window.location.search);
+  //       const episodeSlugFromQuery = queryParams.get('episode');
+  //       const typeFromQuery = queryParams.get('type');
 
-        if (episodeSlugFromQuery && typeFromQuery) {
-          // Tìm server phù hợp với type
-          const serverIndex = episodes.findIndex(server => {
-            const serverType = formatTypeMovie(server.server_name);
-            return typeFromQuery === serverType;
-          });
+  //       if (episodeSlugFromQuery && typeFromQuery) {
+  //         // Tìm server phù hợp với type
+  //         const serverIndex = episodes.findIndex(server => {
+  //           const serverType = formatTypeMovie(server.server_name);
+  //           return typeFromQuery === serverType;
+  //         });
 
-          if (serverIndex !== -1) {
-            setActiveServerIndex(serverIndex);
-            const targetServer = episodes[serverIndex];
-            const episodeToRestore = targetServer.server_data.find(ep => ep?.slug === episodeSlugFromQuery);
+  //         if (serverIndex !== -1) {
+  //           setActiveServerIndex(serverIndex);
+  //           const targetServer = episodes[serverIndex];
+  //           const episodeToRestore = targetServer.server_data.find(ep => ep?.slug === episodeSlugFromQuery);
 
-            if (episodeToRestore && (!currentEpisode || currentEpisode.link_embed !== episodeToRestore.link_embed)) {
-              const episodeIndex = targetServer.server_data.findIndex(ep => ep?.slug === episodeSlugFromQuery);
-              if (episodeIndex !== -1) {
-                const initialPage = Math.floor(episodeIndex / limitDisplay) + 1;
-                setPage(initialPage);
-              }
-              dispatch(setCurrentEpisode(episodeToRestore));
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error processing URL query:', error);
-      }
-    }
-  }, [isMounted, episodes, redirect, currentEpisode, dispatch]);
+  //           if (episodeToRestore && (!currentEpisode || currentEpisode.link_embed !== episodeToRestore.link_embed)) {
+  //             const episodeIndex = targetServer.server_data.findIndex(ep => ep?.slug === episodeSlugFromQuery);
+  //             if (episodeIndex !== -1) {
+  //               const initialPage = Math.floor(episodeIndex / limitDisplay) + 1;
+  //               setPage(initialPage);
+  //             }
+  //             dispatch(setCurrentEpisode(episodeToRestore));
+  //           }
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error('Error processing URL query:', error);
+  //     }
+  //   }
+  // }, [isMounted, episodes, redirect, currentEpisode, dispatch]);
 
   const handleChangePage = (newPage: number) => {
     if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) return;
