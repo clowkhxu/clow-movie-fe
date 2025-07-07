@@ -42,7 +42,7 @@ const limitDisplay = 24;
 
 
 // --- CLIENT-ONLY COMPONENT ---
-// This component contains all the logic and state. It will only be rendered on the client.
+// This component contains all the logic and state, refactored to be more robust.
 const EpisodesListClient = ({
   episodes = [],
   colums = {
@@ -54,16 +54,49 @@ const EpisodesListClient = ({
   redirect = false,
   showToaster = true,
 }: EpisodesListProps) => {
+  // State for user interaction
   const [activeServerIndex, setActiveServerIndex] = useState(0);
-  const [episodeDisplay, setEpisodeDisplay] = useState<Episode[]>([]);
   const [page, setPage] = useState(1);
 
+  // State for safely derived data to prevent race conditions
+  const [currentServer, setCurrentServer] = useState<ServerData | null>(null);
+  const [currentEpisodes, setCurrentEpisodes] = useState<Episode[]>([]);
+  const [episodeDisplay, setEpisodeDisplay] = useState<Episode[]>([]);
+
+  // Redux selectors
   const dispatch: AppDispatch = useDispatch();
   const { windowWidth } = useSelector((state: RootState) => state.system);
   const { currentEpisode } = useSelector((state: RootState) => state.movie.movieInfo);
 
-  const currentServer = episodes[activeServerIndex];
-  const currentEpisodes = currentServer?.server_data || [];
+  // Effect 1: React to changes in props (episodes) or user selection (activeServerIndex).
+  // This is the main effect to safely process incoming data.
+  useEffect(() => {
+    // Guard: Make sure episodes data is a valid array with content.
+    if (episodes && Array.isArray(episodes) && episodes.length > 0 && episodes[activeServerIndex]) {
+      const serverData = episodes[activeServerIndex];
+      // More validation: ensure the server object and its data are valid.
+      if (serverData && typeof serverData.server_name === 'string' && Array.isArray(serverData.server_data)) {
+        setCurrentServer(serverData);
+        setCurrentEpisodes(serverData.server_data);
+        setPage(1); // Reset page whenever the server changes.
+      }
+    } else {
+      // If data is invalid or not ready, reset state to a safe default.
+      setCurrentServer(null);
+      setCurrentEpisodes([]);
+    }
+  }, [episodes, activeServerIndex]); // This effect runs only when the source data changes.
+
+  // Effect 2: React to changes in the full episode list or page number to update the visible list.
+  useEffect(() => {
+    if (currentEpisodes.length > 0) {
+      const start = (page - 1) * limitDisplay;
+      const end = start + limitDisplay;
+      setEpisodeDisplay(currentEpisodes.slice(start, end));
+    } else {
+      setEpisodeDisplay([]);
+    }
+  }, [currentEpisodes, page]); // This effect runs only after the server data is safely set.
 
   const vietsubIcon = (
     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="1em" width="1em">
@@ -87,31 +120,9 @@ const EpisodesListClient = ({
 
   const getServerInfo = (serverName: string) => {
     const safeServerName = serverName || '';
-    if (safeServerName.includes("Vietsub")) {
-      return { title: "Phụ đề", icon: vietsubIcon };
-    } else if (safeServerName.includes("Thuyết Minh")) {
-      return { title: "Thuyết minh", icon: thuyetMinhIcon };
-    } else {
-      return { title: "Lồng tiếng", icon: dubbedIcon };
-    }
-  };
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeServerIndex]);
-
-  useEffect(() => {
-    if (!Array.isArray(currentEpisodes) || currentEpisodes.length === 0) {
-      setEpisodeDisplay([]);
-      return;
-    }
-    const start = (page - 1) * limitDisplay;
-    const end = start + limitDisplay;
-    setEpisodeDisplay(currentEpisodes.slice(start, end));
-  }, [currentEpisodes, page]);
-
-  const handleChangePage = (newPage: number) => {
-    setPage(newPage);
+    if (safeServerName.includes("Vietsub")) return { title: "Phụ đề", icon: vietsubIcon };
+    if (safeServerName.includes("Thuyết Minh")) return { title: "Thuyết minh", icon: thuyetMinhIcon };
+    return { title: "Lồng tiếng", icon: dubbedIcon };
   };
 
   const handleSetCurrentEpisode = (item: Episode) => {
@@ -121,10 +132,6 @@ const EpisodesListClient = ({
     if (showToaster) {
       handleShowToaster(`Bạn đang xem ${item?.filename || 'tập phim'}`, "Chúc bạn xem phim vui vẻ!");
     }
-  };
-
-  const handleServerChange = (serverIndex: number) => {
-    setActiveServerIndex(serverIndex);
   };
 
   if (!Array.isArray(episodes) || episodes.length === 0) {
@@ -141,12 +148,11 @@ const EpisodesListClient = ({
         {episodes.map((server, index) => {
           if (!server || typeof server.server_name !== 'string') return null;
           const { title, icon } = getServerInfo(server.server_name);
-          const isActive = activeServerIndex === index;
           return (
             <Box
               key={index}
-              onClick={() => handleServerChange(index)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive ? 'border border-white text-white' : 'text-white border border-transparent'}`}
+              onClick={() => setActiveServerIndex(index)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${activeServerIndex === index ? 'border border-white text-white' : 'text-white border border-transparent'}`}
               style={{ minWidth: 'fit-content', boxSizing: 'border-box' }}
             >
               <Box className="text-white flex-shrink-0">{icon}</Box>
@@ -157,17 +163,16 @@ const EpisodesListClient = ({
       </Box>
 
       <Box className={`grid grid-cols-${colums.base} md:grid-cols-${colums.md} lg:grid-cols-${colums.lg} xl:grid-cols-${colums.xl} lg:gap-4 gap-2`}>
-        {currentServer && episodeDisplay.map((item, index) => {
+        {currentServer && episodeDisplay.map((item) => {
           if (!item || !item.link_embed) return null;
-          const isActive = currentEpisode?.link_embed === item.link_embed;
           return (
             <EpisodeItem
-              key={`${currentServer.server_name}-${item.link_embed}-${index}`}
+              key={`${currentServer.server_name}-${item.link_embed}`}
               item={item}
               server_name={currentServer.server_name}
               redirect={redirect}
               handleSetCurrentEpisode={handleSetCurrentEpisode}
-              isActive={isActive}
+              isActive={currentEpisode?.link_embed === item.link_embed}
             />
           );
         })}
@@ -181,7 +186,7 @@ const EpisodesListClient = ({
             pageSize={limitDisplay}
             page={page}
             siblingCount={1}
-            onPageChange={(details) => handleChangePage(details.page)}
+            onPageChange={(details) => setPage(details.page)}
           >
             <HStack>
               <PaginationItems className="bg-[#282b3a] border border-[#1e2939] text-gray-50 hover:bg-transparent" />
@@ -195,7 +200,6 @@ const EpisodesListClient = ({
 
 
 // --- MAIN EXPORTED COMPONENT (HYDRATION GATE) ---
-// This component acts as a "gate" to ensure the main logic only runs on the client.
 const EpisodesList = (props: EpisodesListProps) => {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -204,8 +208,6 @@ const EpisodesList = (props: EpisodesListProps) => {
   }, []);
 
   if (!isMounted) {
-    // This static placeholder is rendered on the server and on the initial client render.
-    // It guarantees no mismatch and prevents the "client-side exception" error.
     return (
       <Box className="flex flex-col gap-4 mt-4">
         <Box className="text-gray-50 text-xs font-semibold">Đang tải danh sách tập...</Box>
@@ -213,7 +215,6 @@ const EpisodesList = (props: EpisodesListProps) => {
     );
   }
 
-  // Once mounted on the client, we render the actual component with all its logic.
   return <EpisodesListClient {...props} />;
 };
 
