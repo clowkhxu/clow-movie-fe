@@ -12,6 +12,7 @@ import {
 import { setCurrentEpisode } from "@/store/slices/movieSlice";
 import EpisodeItem from "./EpisodeItem";
 
+// --- TYPE DEFINITIONS ---
 type Episode = {
   name: string;
   slug: string;
@@ -39,7 +40,10 @@ interface EpisodesListProps {
 
 const limitDisplay = 24;
 
-const EpisodesList = ({
+
+// --- CLIENT-ONLY COMPONENT ---
+// This component contains all the logic and state. It will only be rendered on the client.
+const EpisodesListClient = ({
   episodes = [],
   colums = {
     base: 2,
@@ -53,17 +57,14 @@ const EpisodesList = ({
   const [activeServerIndex, setActiveServerIndex] = useState(0);
   const [episodeDisplay, setEpisodeDisplay] = useState<Episode[]>([]);
   const [page, setPage] = useState(1);
-  const [isMounted, setIsMounted] = useState(false);
 
   const dispatch: AppDispatch = useDispatch();
   const { windowWidth } = useSelector((state: RootState) => state.system);
   const { currentEpisode } = useSelector((state: RootState) => state.movie.movieInfo);
 
-  // Lấy server hiện tại
   const currentServer = episodes[activeServerIndex];
   const currentEpisodes = currentServer?.server_data || [];
 
-  // Định nghĩa các icon với màu trắng
   const vietsubIcon = (
     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="1em" width="1em">
       <path fill="none" d="M0 0h24v24H0z"></path>
@@ -84,9 +85,7 @@ const EpisodesList = ({
     </svg>
   );
 
-  // Hàm lấy icon và title dựa trên server name
   const getServerInfo = (serverName: string) => {
-    // Thêm guard để đảm bảo hàm không bị crash nếu serverName không hợp lệ
     const safeServerName = serverName || '';
     if (safeServerName.includes("Vietsub")) {
       return { title: "Phụ đề", icon: vietsubIcon };
@@ -97,73 +96,36 @@ const EpisodesList = ({
     }
   };
 
-  // Hydration fix: Chỉ set isMounted thành true ở phía client
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    setPage(1);
+  }, [activeServerIndex]);
 
-  // Reset page khi server thay đổi
   useEffect(() => {
-    if (isMounted) {
-      setPage(1);
-    }
-  }, [activeServerIndex, isMounted]);
-
-  // Cập nhật display episodes
-  useEffect(() => {
-    if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) {
+    if (!Array.isArray(currentEpisodes) || currentEpisodes.length === 0) {
       setEpisodeDisplay([]);
       return;
     }
-
     const start = (page - 1) * limitDisplay;
     const end = start + limitDisplay;
     setEpisodeDisplay(currentEpisodes.slice(start, end));
-  }, [currentEpisodes, page, isMounted]);
+  }, [currentEpisodes, page]);
 
   const handleChangePage = (newPage: number) => {
-    if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) return;
-
-    try {
-      const start = (newPage - 1) * limitDisplay;
-      const end = start + limitDisplay;
-      setEpisodeDisplay(currentEpisodes.slice(start, end));
-      setPage(newPage);
-    } catch (error) {
-      console.error('Error changing page:', error);
-    }
+    setPage(newPage);
   };
 
   const handleSetCurrentEpisode = (item: Episode) => {
-    if (!isMounted || !item || redirect) return;
+    if (!item || redirect) return;
     if (currentEpisode?.link_embed === item.link_embed) return;
-
-    try {
-      dispatch(setCurrentEpisode(item));
-
-      if (showToaster) {
-        handleShowToaster(
-          `Bạn đang xem ${item?.filename || 'tập phim'}`,
-          "Chúc bạn xem phim vui vẻ!"
-        );
-      }
-    } catch (error) {
-      console.error('Error setting current episode:', error);
+    dispatch(setCurrentEpisode(item));
+    if (showToaster) {
+      handleShowToaster(`Bạn đang xem ${item?.filename || 'tập phim'}`, "Chúc bạn xem phim vui vẻ!");
     }
   };
 
   const handleServerChange = (serverIndex: number) => {
     setActiveServerIndex(serverIndex);
-    setPage(1);
   };
-
-  if (!isMounted) {
-    return (
-      <Box className="flex flex-col gap-4 mt-4">
-        <Box className="text-gray-50 text-xs font-semibold">Đang tải...</Box>
-      </Box>
-    );
-  }
 
   if (!Array.isArray(episodes) || episodes.length === 0) {
     return (
@@ -175,48 +137,29 @@ const EpisodesList = ({
 
   return (
     <Box className="flex flex-col gap-4 mt-4">
-      {/* Tabs ngang cho các server */}
       <Box className="flex gap-2 items-center min-h-[40px]">
         {episodes.map((server, index) => {
-          // Thêm guard để bỏ qua các server không hợp lệ
-          if (!server || typeof server.server_name !== 'string') {
-            return null;
-          }
+          if (!server || typeof server.server_name !== 'string') return null;
           const { title, icon } = getServerInfo(server.server_name);
           const isActive = activeServerIndex === index;
-
           return (
             <Box
               key={index}
               onClick={() => handleServerChange(index)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive
-                ? 'border border-white text-white'
-                : 'text-white border border-transparent'
-                }`}
-              style={{
-                minWidth: 'fit-content',
-                boxSizing: 'border-box'
-              }}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive ? 'border border-white text-white' : 'text-white border border-transparent'}`}
+              style={{ minWidth: 'fit-content', boxSizing: 'border-box' }}
             >
-              <Box className="text-white flex-shrink-0">
-                {icon}
-              </Box>
+              <Box className="text-white flex-shrink-0">{icon}</Box>
               <span className="text-xs font-semibold text-white whitespace-nowrap">{title}</span>
             </Box>
           );
         })}
       </Box>
 
-      {/* Episodes grid */}
-      <Box
-        className={`grid grid-cols-${colums.base} md:grid-cols-${colums.md} lg:grid-cols-${colums.lg} xl:grid-cols-${colums.xl} lg:gap-4 gap-2`}
-      >
-        {/* CRITICAL FIX: Ensure currentServer exists before mapping */}
-        {currentServer && episodeDisplay.map((item: Episode, index: number) => {
+      <Box className={`grid grid-cols-${colums.base} md:grid-cols-${colums.md} lg:grid-cols-${colums.lg} xl:grid-cols-${colums.xl} lg:gap-4 gap-2`}>
+        {currentServer && episodeDisplay.map((item, index) => {
           if (!item || !item.link_embed) return null;
-
-          const isActive = false;
-
+          const isActive = currentEpisode?.link_embed === item.link_embed;
           return (
             <EpisodeItem
               key={`${currentServer.server_name}-${item.link_embed}-${index}`}
@@ -230,11 +173,10 @@ const EpisodesList = ({
         })}
       </Box>
 
-      {/* Pagination */}
       {currentEpisodes.length > limitDisplay && (
         <Box className="flex mx-auto my-6">
           <PaginationRoot
-            size={"md"}
+            size={windowWidth < 768 ? "xs" : "md"}
             count={currentEpisodes.length}
             pageSize={limitDisplay}
             page={page}
@@ -249,6 +191,30 @@ const EpisodesList = ({
       )}
     </Box>
   );
+};
+
+
+// --- MAIN EXPORTED COMPONENT (HYDRATION GATE) ---
+// This component acts as a "gate" to ensure the main logic only runs on the client.
+const EpisodesList = (props: EpisodesListProps) => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    // This static placeholder is rendered on the server and on the initial client render.
+    // It guarantees no mismatch and prevents the "client-side exception" error.
+    return (
+      <Box className="flex flex-col gap-4 mt-4">
+        <Box className="text-gray-50 text-xs font-semibold">Đang tải danh sách tập...</Box>
+      </Box>
+    );
+  }
+
+  // Once mounted on the client, we render the actual component with all its logic.
+  return <EpisodesListClient {...props} />;
 };
 
 export default EpisodesList;
