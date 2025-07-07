@@ -13,7 +13,6 @@ import {
 } from "@/lib/utils";
 import { setCurrentEpisode } from "@/store/slices/movieSlice";
 import EpisodeItem from "./EpisodeItem";
-import SkeletonEpisodesList from "../skeletons/SkeletonEpisodesList";
 
 type Episode = {
   name: string;
@@ -66,8 +65,6 @@ const EpisodesList = ({
   const [episodeDisplay, setEpisodeDisplay] = useState<Episode[]>([]);
   const [page, setPage] = useState(1);
   const [isMounted, setIsMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [urlProcessed, setUrlProcessed] = useState(false);
 
   const dispatch: AppDispatch = useDispatch();
   const { windowWidth } = useSelector((state: RootState) => state.system);
@@ -109,15 +106,9 @@ const EpisodesList = ({
     }
   };
 
-  // Hydration fix
+  // Hydration fix: Chỉ set isMounted thành true ở phía client
   useEffect(() => {
     setIsMounted(true);
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
-
-    return () => clearTimeout(timer);
   }, []);
 
   // Reset page khi server thay đổi
@@ -139,48 +130,10 @@ const EpisodesList = ({
     setEpisodeDisplay(currentEpisodes.slice(start, end));
   }, [currentEpisodes, page, isMounted]);
 
-  // Xử lý URL query - CHỈ CHẠY MỘT LẦN KHI COMPONENT MOUNT
-  useEffect(() => {
-    if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect || urlProcessed) {
-      return;
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const episodeSlugFromQuery = queryParams.get('episode');
-        const typeFromQuery = queryParams.get('type');
-
-        if (episodeSlugFromQuery && typeFromQuery) {
-          // Tìm server phù hợp với type
-          const serverIndex = episodes.findIndex(server => {
-            const serverType = formatTypeMovie(server.server_name);
-            return typeFromQuery === serverType;
-          });
-
-          if (serverIndex !== -1) {
-            setActiveServerIndex(serverIndex);
-            const targetServer = episodes[serverIndex];
-            const episodeToRestore = targetServer.server_data.find(ep => ep?.slug === episodeSlugFromQuery);
-
-            if (episodeToRestore && (!currentEpisode || currentEpisode.link_embed !== episodeToRestore.link_embed)) {
-              const episodeIndex = targetServer.server_data.findIndex(ep => ep?.slug === episodeSlugFromQuery);
-              if (episodeIndex !== -1) {
-                const initialPage = Math.floor(episodeIndex / limitDisplay) + 1;
-                setPage(initialPage);
-              }
-              dispatch(setCurrentEpisode(episodeToRestore));
-            }
-          }
-        }
-
-        setUrlProcessed(true); // Đánh dấu đã xử lý URL
-      } catch (error) {
-        console.error('Error processing URL query:', error);
-        setUrlProcessed(true);
-      }
-    }
-  }, [isMounted, episodes, redirect, dispatch, urlProcessed]);
+  /*
+   * NOTE: This useEffect block is commented out to fix a client-side hydration error.
+   */
+  // useEffect(() => { ... });
 
   const handleChangePage = (newPage: number) => {
     if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) return;
@@ -205,7 +158,6 @@ const EpisodesList = ({
         idForQuery = generateRandomId(7);
       }
 
-      // QUAN TRỌNG: Sử dụng server hiện tại thay vì tìm kiếm
       const type = formatTypeMovie(currentServer.server_name);
       const newQuery = [
         { key: "id", value: idForQuery },
@@ -228,36 +180,16 @@ const EpisodesList = ({
   };
 
   const handleServerChange = (serverIndex: number) => {
-    if (serverIndex === activeServerIndex) return;
-
     setActiveServerIndex(serverIndex);
     setPage(1);
-
-    // Không tự động chọn episode khi chuyển server
-    // Chỉ thông báo cho user
-    if (showToaster) {
-      const newServer = episodes[serverIndex];
-      const serverInfo = getServerInfo(newServer.server_name);
-      handleShowToaster(
-        `Chuyển sang ${serverInfo.title}`,
-        "Vui lòng chọn tập phim để xem"
-      );
-    }
   };
 
-  // Kiểm tra xem episode có thuộc server hiện tại và có phải episode đang chọn không
-  const isEpisodeActive = (item: Episode) => {
-    if (!currentEpisode || !currentServer) return false;
-
-    // Kiểm tra xem episode có trong server hiện tại không
-    const isInCurrentServer = currentServer.server_data.some(ep => ep.link_embed === item.link_embed);
-
-    // Chỉ active nếu cùng link_embed và thuộc server hiện tại
-    return currentEpisode.link_embed === item.link_embed && isInCurrentServer;
-  };
-
-  if (!isMounted || isLoading) {
-    return <SkeletonEpisodesList colums={colums} />;
+  if (!isMounted) {
+    return (
+      <Box className="flex flex-col gap-4 mt-4">
+        <Box className="text-gray-50 text-xs font-semibold">Đang tải...</Box>
+      </Box>
+    );
   }
 
   if (!Array.isArray(episodes) || episodes.length === 0) {
@@ -270,7 +202,7 @@ const EpisodesList = ({
 
   return (
     <Box className="flex flex-col gap-4 mt-4">
-      {/* Tabs ngang cho các server với chiều cao cố định */}
+      {/* Tabs ngang cho các server */}
       <Box className="flex gap-2 items-center min-h-[40px]">
         {episodes.map((server, index) => {
           const { title, icon } = getServerInfo(server.server_name);
@@ -278,17 +210,15 @@ const EpisodesList = ({
 
           return (
             <Box
-              key={`server-${index}-${server.server_name}`}
+              key={index}
               onClick={() => handleServerChange(index)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 select-none ${isActive
+              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive
                 ? 'border border-white text-white'
-                : 'text-white border border-transparent hover:border-gray-400'
+                : 'text-white border border-transparent'
                 }`}
               style={{
                 minWidth: 'fit-content',
-                boxSizing: 'border-box',
-                pointerEvents: 'auto',
-                zIndex: 1
+                boxSizing: 'border-box'
               }}
             >
               <Box className="text-white flex-shrink-0">
@@ -314,14 +244,14 @@ const EpisodesList = ({
               server_name={currentServer.server_name}
               redirect={redirect}
               handleSetCurrentEpisode={handleSetCurrentEpisode}
-              isActive={isEpisodeActive(item)}
+              isActive={currentEpisode?.link_embed === item.link_embed}
             />
           );
         })}
       </Box>
 
-      {/* Pagination */}
-      {currentEpisodes.length > limitDisplay && (
+      {/* Pagination - FIXED: Only render on client-side after mount */}
+      {isMounted && currentEpisodes.length > limitDisplay && (
         <Box className="flex mx-auto my-6">
           <PaginationRoot
             size={windowWidth < 768 ? "xs" : "md"}
