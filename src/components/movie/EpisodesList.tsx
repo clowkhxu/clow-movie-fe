@@ -237,6 +237,9 @@ const EpisodesList = ({
         {episodeDisplay.map((item: Episode, index: number) => {
           if (!item || !item.link_embed) return null;
 
+          // HYDRATION FIX: Calculate isActive only after client has mounted
+          const isActive = isMounted && currentEpisode?.link_embed === item.link_embed;
+
           return (
             <EpisodeItem
               key={`${currentServer.server_name}-${item.link_embed}-${index}`}
@@ -244,7 +247,7 @@ const EpisodesList = ({
               server_name={currentServer.server_name}
               redirect={redirect}
               handleSetCurrentEpisode={handleSetCurrentEpisode}
-              isActive={currentEpisode?.link_embed === item.link_embed}
+              isActive={isActive}
             />
           );
         })}
