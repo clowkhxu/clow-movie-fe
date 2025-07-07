@@ -1,6 +1,6 @@
 "use client";
 
-import EpisodesList from "@/components/movie/EpisodesList";
+import EpisodesList from "@/components/movie/EpisodeList";
 import { RootState } from "@/store/store";
 import { Box } from "@chakra-ui/react";
 import { useSelector } from "react-redux";

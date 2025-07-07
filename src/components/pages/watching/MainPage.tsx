@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import SectionVideo from "./SectionVideo";
 import SectionInfo from "./SectionInfo";
 import MovieSuggestions from "@/components/movie/MovieSuggestions";
-import EpisodesList from "@/components/movie/EpisodesList";
+import EpisodesList from "@/components/movie/EpisodeList";
 import SkeletonWachingPage from "@/components/skeletons/SkeletonWatchingPage";
 import SkeletonRapPhimButton from "@/components/skeletons/SkeletonRapPhimButton";
 import EmptyData from "@/components/EmptyData";
