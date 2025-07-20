@@ -14,6 +14,7 @@ import {
 import { setCurrentEpisode } from "@/store/slices/movieSlice";
 import EpisodeItem from "./EpisodeItem";
 
+// Định nghĩa các kiểu dữ liệu
 type Episode = {
   name: string;
   slug: string;
@@ -41,6 +42,7 @@ interface EpisodesListProps {
 
 const limitDisplay = 24;
 
+// Hàm tạo ID ngẫu nhiên
 const generateRandomId = (length: number = 7): string => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -69,7 +71,7 @@ const EpisodesList = ({
   const { windowWidth } = useSelector((state: RootState) => state.system);
   const { currentEpisode } = useSelector((state: RootState) => state.movie.movieInfo);
 
-  // Memoize current server và episodes để tránh re-render không cần thiết
+  // Memoize server và episodes hiện tại để tối ưu
   const currentServer = useMemo(() => {
     if (!episodes || !Array.isArray(episodes) || episodes.length === 0) {
       return null;
@@ -84,18 +86,17 @@ const EpisodesList = ({
     return currentServer.server_data;
   }, [currentServer]);
 
-  // Memoize episode display để tránh tính toán lại không cần thiết
+  // Memoize danh sách tập phim hiển thị
   const episodeDisplay = useMemo(() => {
     if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) {
       return [];
     }
-
     const start = (page - 1) * limitDisplay;
     const end = start + limitDisplay;
     return currentEpisodes.slice(start, end);
   }, [currentEpisodes, page, isMounted]);
 
-  // Định nghĩa các icon với màu trắng
+  // ---- Icons (sử dụng useMemo để không tạo lại mỗi lần render) ----
   const vietsubIcon = useMemo(() => (
     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="1em" width="1em">
       <path fill="none" d="M0 0h24v24H0z"></path>
@@ -116,12 +117,11 @@ const EpisodesList = ({
     </svg>
   ), []);
 
-  // Hàm lấy icon và title dựa trên server name - memoized
+  // Hàm lấy thông tin server - memoized
   const getServerInfo = useCallback((serverName: string) => {
     if (!serverName || typeof serverName !== 'string') {
       return { title: "Lồng tiếng", icon: dubbedIcon };
     }
-    
     const lowerServerName = serverName.toLowerCase();
     if (lowerServerName.includes("vietsub")) {
       return { title: "Phụ đề", icon: vietsubIcon };
@@ -132,7 +132,9 @@ const EpisodesList = ({
     }
   }, [vietsubIcon, dubbedIcon, thuyetMinhIcon]);
 
-  // Hydration fix: Chỉ set isMounted thành true ở phía client
+  // ---- useEffect Hooks ----
+
+  // Chỉ set isMounted ở client để tránh hydration error
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -144,14 +146,62 @@ const EpisodesList = ({
     }
   }, [activeServerIndex, isMounted]);
 
+  // === FIX: KHÔI PHỤC TRẠNG THÁI TỪ URL KHI REFRESH TRANG ===
+  useEffect(() => {
+    // Chỉ chạy ở client, sau khi đã mount và có dữ liệu
+    if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect) {
+      return;
+    }
+
+    // `window` an toàn để truy cập bên trong useEffect
+    try {
+      const queryParams = new URLSearchParams(window.location.search);
+      const episodeSlugFromQuery = queryParams.get('episode');
+      const typeFromQuery = queryParams.get('type');
+
+      // Nếu có đủ tham số trên URL
+      if (episodeSlugFromQuery && typeFromQuery) {
+        // 1. Tìm server khớp với 'type' trên URL
+        const serverIndex = episodes.findIndex(
+          (server) => formatTypeMovie(server.server_name) === typeFromQuery
+        );
+
+        if (serverIndex !== -1) {
+          const targetServer = episodes[serverIndex];
+          const allEpisodesInServer = targetServer.server_data;
+
+          // 2. Tìm tập phim khớp với 'slug' trên URL
+          const episodeToRestore = allEpisodesInServer.find(
+            (ep) => ep?.slug === episodeSlugFromQuery
+          );
+
+          if (episodeToRestore && currentEpisode?.link_embed !== episodeToRestore.link_embed) {
+            // 3. Cập nhật state để khớp với URL
+            setActiveServerIndex(serverIndex);
+            dispatch(setCurrentEpisode(episodeToRestore));
+
+            // 4. Chuyển đến đúng trang pagination
+            const episodeIndexInList = allEpisodesInServer.findIndex(
+              (ep) => ep?.slug === episodeSlugFromQuery
+            );
+            if (episodeIndexInList !== -1) {
+              const newPage = Math.floor(episodeIndexInList / limitDisplay) + 1;
+              setPage(newPage);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Lỗi khi khôi phục trạng thái từ URL:', error);
+    }
+  }, [isMounted, episodes, dispatch, redirect, currentEpisode]); // Dependencies
+
+
+  // ---- Callback Handlers ----
+
   const handleChangePage = useCallback((newPage: number) => {
     if (!isMounted || !Array.isArray(currentEpisodes) || currentEpisodes.length === 0) return;
-
-    try {
-      setPage(newPage);
-    } catch (error) {
-      console.error('Error changing page:', error);
-    }
+    setPage(newPage);
   }, [isMounted, currentEpisodes]);
 
   const handleSetCurrentEpisode = useCallback((item: Episode) => {
@@ -159,12 +209,9 @@ const EpisodesList = ({
     if (currentEpisode?.link_embed === item.link_embed) return;
 
     try {
-      let idForQuery = getIdFromLinkEmbed(item.link_embed, 8);
-      if (!idForQuery) {
-        idForQuery = generateRandomId(7);
-      }
-
+      let idForQuery = getIdFromLinkEmbed(item.link_embed, 8) || generateRandomId(7);
       const type = formatTypeMovie(currentServer?.server_name || '');
+
       const newQuery = [
         { key: "id", value: idForQuery },
         { key: "episode", value: item.slug || '' },
@@ -181,24 +228,26 @@ const EpisodesList = ({
         );
       }
     } catch (error) {
-      console.error('Error setting current episode:', error);
+      console.error('Lỗi khi chọn tập phim:', error);
     }
   }, [isMounted, redirect, currentEpisode, currentServer, dispatch, showToaster]);
 
   const handleServerChange = useCallback((serverIndex: number) => {
     setActiveServerIndex(serverIndex);
-    setPage(1);
   }, []);
 
-  // Early returns với loading states
+  // ---- Render Logic ----
+
+  // Trạng thái loading ban đầu
   if (!isMounted) {
     return (
       <Box className="flex flex-col gap-4 mt-4">
-        <Box className="text-gray-50 text-xs font-semibold">Đang tải...</Box>
+        <Box className="text-gray-50 text-xs font-semibold">Đang tải danh sách tập...</Box>
       </Box>
     );
   }
 
+  // Không có dữ liệu
   if (!Array.isArray(episodes) || episodes.length === 0) {
     return (
       <Box className="flex flex-col gap-4 mt-4">
@@ -207,13 +256,21 @@ const EpisodesList = ({
     );
   }
 
+  // Cải thiện cách dùng class động của Tailwind
+  const gridColsClasses = {
+    base: `grid-cols-${colums.base}`,
+    md: `md:grid-cols-${colums.md}`,
+    lg: `lg:grid-cols-${colums.lg}`,
+    xl: `xl:grid-cols-${colums.xl}`,
+  };
+
   return (
     <Box className="flex flex-col gap-4 mt-4">
-      {/* Tabs ngang cho các server */}
-      <Box className="flex gap-2 items-center min-h-[40px]">
+      {/* Tabs chọn server */}
+      <Box className="flex gap-2 items-center min-h-[40px] overflow-x-auto pb-2">
         {episodes.map((server, index) => {
           if (!server || !server.server_name) return null;
-          
+
           const { title, icon } = getServerInfo(server.server_name);
           const isActive = activeServerIndex === index;
 
@@ -222,26 +279,28 @@ const EpisodesList = ({
               key={`${server.server_name}-${index}`}
               onClick={() => handleServerChange(index)}
               className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive
-                ? 'border border-white text-white'
-                : 'text-white border border-transparent'
+                ? 'border border-white text-white bg-white/10'
+                : 'text-white border border-transparent hover:bg-white/5'
                 }`}
-              style={{
-                minWidth: 'fit-content',
-                boxSizing: 'border-box'
-              }}
+              style={{ flexShrink: 0 }}
             >
-              <Box className="text-white flex-shrink-0">
-                {icon}
-              </Box>
+              <Box className="text-white">{icon}</Box>
               <span className="text-xs font-semibold text-white whitespace-nowrap">{title}</span>
             </Box>
           );
         })}
       </Box>
 
-      {/* Episodes grid */}
+      {/* Lưới các tập phim */}
+      {/* LƯU Ý QUAN TRỌNG VỀ TAILWIND:
+        Tailwind CSS cần thấy chuỗi class đầy đủ trong code của bạn để generate ra CSS tương ứng.
+        Việc dùng `grid-cols-${colums.base}` có thể không hoạt động nếu các class như `grid-cols-2`, `md:grid-cols-4`... 
+        không xuất hiện ở đâu khác trong project. 
+        Để chắc chắn, bạn nên thêm chúng vào file `tailwind.config.js` trong phần `safelist`.
+        Ví dụ: safelist: ['grid-cols-2', 'md:grid-cols-4', 'lg:grid-cols-6', 'xl:grid-cols-8']
+      */}
       <Box
-        className={`grid grid-cols-${colums.base} md:grid-cols-${colums.md} lg:grid-cols-${colums.lg} xl:grid-cols-${colums.xl} lg:gap-4 gap-2`}
+        className={`grid ${gridColsClasses.base} ${gridColsClasses.md} ${gridColsClasses.lg} ${gridColsClasses.xl} lg:gap-4 gap-2`}
       >
         {episodeDisplay.map((item: Episode, index: number) => {
           if (!item || !item.link_embed) return null;
@@ -259,7 +318,7 @@ const EpisodesList = ({
         })}
       </Box>
 
-      {/* Pagination - FIXED: Only render on client-side after mount */}
+      {/* Phân trang */}
       {isMounted && currentEpisodes.length > limitDisplay && (
         <Box className="flex mx-auto my-6">
           <PaginationRoot
