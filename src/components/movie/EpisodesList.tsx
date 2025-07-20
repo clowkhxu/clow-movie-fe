@@ -22,10 +22,10 @@ type Episode = {
   filename: string;
 };
 
-// Interface props được cập nhật để nhận 'episodes' thay vì 'server_data'
+// Interface props được cập nhật để 'server_name' là tùy chọn
 interface EpisodesListProps {
-  server_name: string;
-  episodes: Episode[]; // Đã thay đổi từ server_data thành episodes
+  server_name?: string; // Đã thay đổi: server_name bây giờ là tùy chọn
+  episodes: Episode[];
   colums?: {
     base: number;
     md: number;
@@ -49,8 +49,8 @@ const generateRandomId = (length: number = 7): string => {
 
 // Component bây giờ chấp nhận trực tiếp prop 'episodes'
 const EpisodesList = ({
-  episodes = [], // Đã thay đổi từ server_data: episodes
-  server_name,
+  episodes = [],
+  server_name = "", // Đã thay đổi: Cung cấp giá trị mặc định cho server_name
   colums = {
     base: 2,
     md: 4,
@@ -130,7 +130,7 @@ const EpisodesList = ({
 
   // Xử lý query từ URL để khôi phục trạng thái tập phim
   useEffect(() => {
-    if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect) {
+    if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect || !server_name) {
       return;
     }
 
@@ -175,7 +175,7 @@ const EpisodesList = ({
   };
 
   const handleSetCurrentEpisode = (item: Episode) => {
-    if (!isMounted || !item || redirect) return;
+    if (!isMounted || !item || redirect || !server_name) return;
     if (currentEpisode?.link_embed === item.link_embed) return;
 
     try {
