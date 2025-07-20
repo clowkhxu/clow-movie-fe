@@ -209,7 +209,8 @@ const EpisodesList = ({
     if (currentEpisode?.link_embed === item.link_embed) return;
 
     try {
-      let idForQuery = getIdFromLinkEmbed(item.link_embed, 8) || generateRandomId(7);
+      // FIX: Changed 'let' to 'const' as idForQuery is not reassigned.
+      const idForQuery = getIdFromLinkEmbed(item.link_embed, 8) || generateRandomId(7);
       const type = formatTypeMovie(currentServer?.server_name || '');
 
       const newQuery = [
@@ -279,8 +280,8 @@ const EpisodesList = ({
               key={`${server.server_name}-${index}`}
               onClick={() => handleServerChange(index)}
               className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${isActive
-                ? 'border border-white text-white bg-white/10'
-                : 'text-white border border-transparent hover:bg-white/5'
+                  ? 'border border-white text-white bg-white/10'
+                  : 'text-white border border-transparent hover:bg-white/5'
                 }`}
               style={{ flexShrink: 0 }}
             >
