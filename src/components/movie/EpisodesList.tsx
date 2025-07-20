@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
 import {
   changeQuery,
-  formatTypeMovie, // Đảm bảo hàm này xử lý 'Thuyết Minh' đúng cách (ví dụ: trả về 'thuyet-minh')
+  formatTypeMovie,
   getIdFromLinkEmbed,
   handleShowToaster,
 } from "@/lib/utils";
@@ -22,9 +22,10 @@ type Episode = {
   filename: string;
 };
 
+// Interface props được cập nhật để nhận 'episodes' thay vì 'server_data'
 interface EpisodesListProps {
   server_name: string;
-  server_data: Episode[];
+  episodes: Episode[]; // Đã thay đổi từ server_data thành episodes
   colums?: {
     base: number;
     md: number;
@@ -46,8 +47,9 @@ const generateRandomId = (length: number = 7): string => {
   return result;
 };
 
+// Component bây giờ chấp nhận trực tiếp prop 'episodes'
 const EpisodesList = ({
-  server_data: episodes = [],
+  episodes = [], // Đã thay đổi từ server_data: episodes
   server_name,
   colums = {
     base: 2,
@@ -81,7 +83,6 @@ const EpisodesList = ({
     </svg>
   );
 
-  // Icon mới cho server Thuyết Minh
   const thuyetMinhIcon = (
     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
       <path d="M1 22C1 17.5817 4.58172 14 9 14C13.4183 14 17 17.5817 17 22H1ZM9 13C5.685 13 3 10.315 3 7.00002C3 3.68502 5.685 1.00002 9 1.00002C12.315 1.00002 15 3.68502 15 7.00002C15 10.315 12.315 13 9 13ZM18.2463 3.18451C18.732 4.36026 19 5.64884 19 7.00002C19 8.35119 18.732 9.63977 18.2463 10.8155L16.5694 9.59595C16.8485 8.78194 17 7.90867 17 7.00002C17 6.09136 16.8485 5.21809 16.5694 4.40408L18.2463 3.18451ZM21.5476 0.783569C22.4773 2.65651 23 4.76723 23 7.00002C23 9.23281 22.4773 11.3435 21.5476 13.2165L19.9027 12.0201C20.6071 10.4928 21 8.79231 21 7.00002C21 5.20772 20.6071 3.5072 19.9027 1.9799L21.5476 0.783569Z"></path>
@@ -93,30 +94,29 @@ const EpisodesList = ({
 
   // Xác định tiêu đề và icon dựa trên server_name
   if (server_name.includes("Vietsub")) {
-    title = "Phụ đề"; // Đã thay đổi từ "Vietsub" sang "Phụ đề"
+    title = "Phụ đề";
     currentIcon = vietsubIcon;
   } else if (server_name.includes("Thuyết Minh")) {
     title = "Thuyết minh";
     currentIcon = thuyetMinhIcon;
   } else {
-    // Mặc định là Lồng Tiếng nếu không khớp Vietsub hoặc Thuyết Minh
     title = "Lồng tiếng";
     currentIcon = dubbedIcon;
   }
 
-  // Hydration fix
+  // Sửa lỗi hydration
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Reset page khi server thay đổi
+  // Reset trang khi server thay đổi
   useEffect(() => {
     if (isMounted) {
       setPage(1);
     }
   }, [server_name, isMounted]);
 
-  // Cập nhật display episodes
+  // Cập nhật danh sách tập phim hiển thị
   useEffect(() => {
     if (!isMounted || !Array.isArray(episodes) || episodes.length === 0) {
       setEpisodeDisplay([]);
@@ -128,7 +128,7 @@ const EpisodesList = ({
     setEpisodeDisplay(episodes.slice(start, end));
   }, [episodes, page, isMounted]);
 
-  // Xử lý URL query - CHỈ khôi phục nếu type trong URL khớp với server hiện tại
+  // Xử lý query từ URL để khôi phục trạng thái tập phim
   useEffect(() => {
     if (!isMounted || !Array.isArray(episodes) || episodes.length === 0 || redirect) {
       return;
@@ -138,13 +138,11 @@ const EpisodesList = ({
       try {
         const queryParams = new URLSearchParams(window.location.search);
         const episodeSlugFromQuery = queryParams.get('episode');
-        const typeFromQuery = queryParams.get('type'); // Lấy type từ URL
+        const typeFromQuery = queryParams.get('type');
 
-        // Chỉ khôi phục nếu type trong URL khớp với server hiện tại
         if (episodeSlugFromQuery && typeFromQuery) {
-          const currentServerType = formatTypeMovie(server_name); // "vietsub", "long-tieng", hoặc "thuyet-minh"
+          const currentServerType = formatTypeMovie(server_name);
 
-          // Chỉ xử lý nếu type khớp
           if (typeFromQuery === currentServerType) {
             const episodeToRestore = episodes.find(ep => ep?.slug === episodeSlugFromQuery);
             if (episodeToRestore && (!currentEpisode || currentEpisode.link_embed !== episodeToRestore.link_embed)) {
@@ -186,7 +184,7 @@ const EpisodesList = ({
         idForQuery = generateRandomId(7);
       }
 
-      const type = formatTypeMovie(server_name); // Cập nhật type theo server hiện tại
+      const type = formatTypeMovie(server_name);
       const newQuery = [
         { key: "id", value: idForQuery },
         { key: "episode", value: item.slug || '' },
@@ -207,21 +205,22 @@ const EpisodesList = ({
     }
   };
 
-
+  // Trạng thái đang tải
   if (!isMounted) {
     return (
-      <Box className="flex flex-col gap-4 mt-4"> {/* Added mt-4 here */}
-        <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start"> {/* Removed mt-4 from here */}
+      <Box className="flex flex-col gap-4 mt-4">
+        <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start">
           <h3 className="text-gray-50 text-xs font-semibold">Đang tải...</h3>
         </Box>
       </Box>
     );
   }
 
+  // Trạng thái không có tập phim
   if (!Array.isArray(episodes) || episodes.length === 0) {
     return (
-      <Box className="flex flex-col gap-4 mt-4"> {/* Added mt-4 here */}
-        <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start"> {/* Removed mt-4 from here */}
+      <Box className="flex flex-col gap-4 mt-4">
+        <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start">
           {currentIcon}
           <h3 className="text-gray-50 text-xs font-semibold">{title}</h3>
         </Box>
@@ -230,9 +229,12 @@ const EpisodesList = ({
     );
   }
 
+  // LƯU Ý: Các class grid-cols-* động có thể không hoạt động với trình biên dịch JIT của Tailwind.
+  // An toàn hơn là sử dụng map hoặc switch để trả về tên class đầy đủ.
+  // Ví dụ: `grid-cols-${colums.base}` -> `grid-cols-2`
   return (
-    <Box className="flex flex-col gap-4 mt-4"> {/* Added mt-4 here */}
-      <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start"> {/* Removed mt-4 from here */}
+    <Box className="flex flex-col gap-4 mt-4">
+      <Box className="items-center gap-1 text-gray-50 rounded-md bg-[#ffffff10] px-3 py-1 inline-flex self-start">
         {currentIcon}
         <h3 className="text-gray-50 text-xs font-semibold">{title}</h3>
       </Box>
